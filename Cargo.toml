@@ -12,8 +12,10 @@ keywords = ["gaming", "games", "voxel"]
 categories = ["games"]
 
 [workspace.dependencies]
-# Local
-
+# Local, unpublished
+geosia_client = { path = "./crates/geosia_client", version = "0.0.0" }
+# Local, published
+gs_schemas = { version = "0.0.1", path = "./lib/gs_schemas" }
 
 # Remote
 bevy = "0.10.1"

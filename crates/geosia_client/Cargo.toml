@@ -8,3 +8,8 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[dependencies]
+# Local
+gs_schemas.workspace = true
+# Remote
+bevy.workspace = true
