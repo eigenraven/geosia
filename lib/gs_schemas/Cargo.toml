@@ -1,0 +1,7 @@
+[package]
+name = "gs_schemas"
+version = "0.0.1"
+description = "Disk and network data serialization schemas for the Geosia game"
+license = "EUPL-1.2"
+repository = "https://github.com/eigenraven/geosia/tree/dev/lib/gs_schemas"
+edition = "2021"

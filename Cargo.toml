@@ -1,0 +1,36 @@
+[workspace]
+members = ["lib/*", "crates/*"]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.70"
+edition = "2021"
+license = "EUPL-1.2"
+authors = ["Geosia team"]
+repository = "https://github.com/eigenraven/geosia"
+keywords = ["gaming", "games", "voxel"]
+categories = ["games"]
+
+[workspace.dependencies]
+# Local
+
+
+# Remote
+bevy = "0.10.1"
+bytemuck = { version = "1.12", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive"] }
+
+[profile.dev]
+opt-level = 1
+debug-assertions = true
+debug = 2
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = 1
+opt-level = 3
+codegen-units = 1
+lto = "thin"
+incremental = false
+
