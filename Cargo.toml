@@ -14,12 +14,39 @@ categories = ["games"]
 [workspace.dependencies]
 # Local, unpublished
 geosia_client = { path = "./crates/geosia_client", version = "0.0.0" }
+geosia_common = { path = "./crates/geosia_common", version = "0.0.0" }
 # Local, published
 gs_schemas = { version = "0.0.1", path = "./lib/gs_schemas" }
 
 # Remote
-bevy = "0.10.1"
-bytemuck = { version = "1.12", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive"] }
+bytemuck = { version = "1.12.3", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive", "zeroable_maybe_uninit", "zeroable_atomics", "must_cast"] }
+kstring = { version = "2.0.0", features = ["serde"] }
+serde = { version = "1.0.164", features = ["derive"] }
+smallvec = { version = "1.10.0", features = ["serde", "const_generics", "const_new", "write", "union"] }
+
+[workspace.dependencies.bevy]
+version = "0.10.1"
+default-features = false
+# Extra features used in geosia_client
+features = [
+    # Default Bevy functionality:
+    "bevy_asset",         # Assets management
+    "animation",          # Animation support
+    "filesystem_watcher", # Asset hot-reloading
+    "android_shared_stdcxx", # For Android builds, use shared C++ library
+
+    # Extra Bevy functionality:
+    "serialize",            # Support for `serde` Serialize/Deserialize
+    "bevy_dynamic_plugin",  # Support for loading of `DynamicPlugin`s
+
+    # Development/Debug features:
+    "dynamic_linking", # Dynamic linking for faster compile-times
+    "trace",           # Enable tracing for performance measurement
+    # "detailed_trace",  # Make traces more verbose
+    "trace_tracy",     # Tracing using `tracy`
+    # "trace_chrome",    # Tracing using the Chrome format
+]
+
 
 [profile.dev]
 opt-level = 1

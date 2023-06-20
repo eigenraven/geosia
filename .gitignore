@@ -10,4 +10,4 @@ crates/*/target
 .DS_Store
 /out/
 Thumbs.db
-
+/wgpu_trace/

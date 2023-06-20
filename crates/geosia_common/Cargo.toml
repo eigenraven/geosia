@@ -1,0 +1,15 @@
+[package]
+name = "geosia_common"
+version = "0.0.0"
+description = "Geosia game shared client+server code"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Local
+gs_schemas.workspace = true
+# Remote
+bevy.workspace = true
