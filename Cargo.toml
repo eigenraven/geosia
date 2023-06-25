@@ -25,7 +25,8 @@ serde = { version = "1.0.164", features = ["derive"] }
 smallvec = { version = "1.10.0", features = ["serde", "const_generics", "const_new", "write", "union"] }
 
 [workspace.dependencies.bevy]
-version = "0.10.1"
+git = "https://github.com/bevyengine/bevy.git"
+rev = "469a19c290861049ad121aa83d72f830d1ec9b40"
 default-features = false
 # Extra features used in geosia_client
 features = [
