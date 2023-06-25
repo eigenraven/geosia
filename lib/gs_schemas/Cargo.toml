@@ -5,3 +5,10 @@ description = "Disk and network data serialization schemas for the Geosia game"
 license = "EUPL-1.2"
 repository = "https://github.com/eigenraven/geosia/tree/dev/lib/gs_schemas"
 edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+hashbrown.workspace = true
+kstring.workspace = true
+serde.workspace = true
+smallvec.workspace = true

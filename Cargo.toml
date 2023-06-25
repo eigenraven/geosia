@@ -19,7 +19,9 @@ geosia_common = { path = "./crates/geosia_common", version = "0.0.0" }
 gs_schemas = { version = "0.0.1", path = "./lib/gs_schemas" }
 
 # Remote
+anyhow = "1.0.71"
 bytemuck = { version = "1.12.3", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive", "zeroable_maybe_uninit", "zeroable_atomics", "must_cast"] }
+hashbrown = { version = "0.14", features = ["serde", "nightly"] }
 kstring = { version = "2.0.0", features = ["serde"] }
 serde = { version = "1.0.164", features = ["derive"] }
 smallvec = { version = "1.10.0", features = ["serde", "const_generics", "const_new", "write", "union"] }
