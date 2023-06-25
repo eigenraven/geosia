@@ -75,15 +75,47 @@ mod debug_window {
         }
     }
 
-    fn debug_window_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    fn debug_window_setup(
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<StandardMaterial>>,
+    ) {
         log::warn!("Setting up debug window");
         let font: Handle<Font> = asset_server.load("fonts/cascadiacode.ttf");
-        commands.spawn(Camera3dBundle::default());
+        commands.spawn(Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 6., 12.0).looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
+            ..default()
+        });
+
+        let debug_material = materials.add(StandardMaterial {
+            base_color: Color::FUCHSIA,
+            ..default()
+        });
+
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(shape::Torus::default().into()),
+            material: debug_material.clone(),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            ..default()
+        });
+
+        commands.spawn(PointLightBundle {
+            point_light: PointLight {
+                intensity: 9000.0,
+                range: 100.,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(0.0, 16.0, 1.0),
+            ..default()
+        });
+
         commands
             .spawn(NodeBundle {
                 style: Style {
-                    width: Val::Percent(50.0),
-                    height: Val::Percent(50.0),
+                    width: Val::Percent(25.0),
+                    height: Val::Percent(25.0),
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
                     ..default()
