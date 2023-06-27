@@ -25,13 +25,13 @@ fn main() {
     // Bevy Base
     app.add_plugins(LogPlugin::default())
         .add_plugins(TaskPoolPlugin::default())
-        .add_plugins(TypeRegistrationPlugin::default())
-        .add_plugins(FrameCountPlugin::default())
-        .add_plugins(TimePlugin::default())
-        .add_plugins(TransformPlugin::default())
-        .add_plugins(HierarchyPlugin::default())
-        .add_plugins(DiagnosticsPlugin::default())
-        .add_plugins(InputPlugin::default())
+        .add_plugins(TypeRegistrationPlugin)
+        .add_plugins(FrameCountPlugin)
+        .add_plugins(TimePlugin)
+        .add_plugins(TransformPlugin)
+        .add_plugins(HierarchyPlugin)
+        .add_plugins(DiagnosticsPlugin)
+        .add_plugins(InputPlugin)
         .add_plugins(WindowPlugin {
             primary_window: Some(Window {
                 title: "Geosia".to_string(),
@@ -43,19 +43,19 @@ fn main() {
         })
         .add_plugins(AccessibilityPlugin)
         .add_plugins(AssetPlugin::default())
-        .add_plugins(ScenePlugin::default())
-        .add_plugins(WinitPlugin::default())
+        .add_plugins(ScenePlugin)
+        .add_plugins(WinitPlugin)
         .add_plugins(RenderPlugin::default())
         .add_plugins(ImagePlugin::default())
-        .add_plugins(PipelinedRenderingPlugin::default())
-        .add_plugins(CorePipelinePlugin::default())
-        .add_plugins(SpritePlugin::default())
-        .add_plugins(TextPlugin::default())
-        .add_plugins(UiPlugin::default())
+        .add_plugins(PipelinedRenderingPlugin)
+        .add_plugins(CorePipelinePlugin)
+        .add_plugins(SpritePlugin)
+        .add_plugins(TextPlugin)
+        .add_plugins(UiPlugin)
         .add_plugins(PbrPlugin::default())
         .add_plugins(AudioPlugin::default())
-        .add_plugins(GilrsPlugin::default())
-        .add_plugins(AnimationPlugin::default())
+        .add_plugins(GilrsPlugin)
+        .add_plugins(AnimationPlugin)
         .add_plugins(GltfPlugin::default());
 
     app.add_plugins(debug_window::DebugWindow);
@@ -95,7 +95,7 @@ mod debug_window {
 
         commands.spawn(PbrBundle {
             mesh: meshes.add(shape::Torus::default().into()),
-            material: debug_material.clone(),
+            material: debug_material,
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         });
