@@ -1,20 +1,22 @@
 use std::fmt::{Display, Formatter};
 use std::num::{NonZeroU32, TryFromIntError};
 
-use anyhow::{bail, Context, Result};
 use hashbrown::{Equivalent, HashMap};
 use kstring::{KString, KStringRef};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 pub static GEOSIA_REGISTRY_DOMAIN: &str = "gs";
 pub static GEOSIA_REGISTRY_DOMAIN_KS: KString = KString::from_static(GEOSIA_REGISTRY_DOMAIN);
 
+/// Simple namespaced registry object name
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct RegistryName {
     pub ns: KString,
     pub key: KString,
 }
 
+/// Reference to a simple namespaced registry object name, see RegistryNamed for the owned variant
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default, Hash)]
 pub struct RegistryNameRef<'n> {
     pub ns: KStringRef<'n>,
@@ -77,6 +79,7 @@ impl<'a> From<&RegistryNameRef<'a>> for RegistryName {
     }
 }
 
+/// Newtype wrapper around a u32 registry ID.
 #[repr(transparent)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, Serialize, Deserialize)]
 pub struct RegistryId(pub NonZeroU32);
@@ -107,6 +110,7 @@ impl<'a> Display for RegistryNameRef<'a> {
     }
 }
 
+/// Needs to be implemented on any object that can be a part of a Registry
 pub trait RegistryObject {
     /// Should be trivial
     fn registry_name(&self) -> RegistryNameRef;
@@ -114,7 +118,7 @@ pub trait RegistryObject {
 
 #[derive(Serialize, Deserialize)]
 pub struct Registry<Object: RegistryObject> {
-    next_free_id: u32,
+    next_free_id: NonZeroU32,
     id_to_obj: Vec<Option<Object>>,
     name_to_id: HashMap<RegistryName, RegistryId>,
 }
@@ -122,24 +126,41 @@ pub struct Registry<Object: RegistryObject> {
 impl<Object: RegistryObject> Default for Registry<Object> {
     fn default() -> Self {
         Self {
-            next_free_id: 1,
+            next_free_id: NonZeroU32::new(1).unwrap(),
             id_to_obj: vec![None],
             name_to_id: HashMap::with_capacity(64),
         }
     }
 }
 
+/// Possible errors from Registry operations
+#[derive(Debug, Error)]
+pub enum RegistryError {
+    #[error("Id {id} already exists when trying to register {name}")]
+    IdAlreadyExists { id: RegistryId, name: RegistryName },
+    #[error("Name {name} already exists in the registry")]
+    NameAlreadyExists { name: RegistryName },
+    /// No more unallocated space in the registry. The allocator is a simple bump allocator, so if objects were removed, it might be possible to optimize the registry down to have free space again.
+    #[error("No free space in the registry")]
+    NoFreeSpace,
+}
+
+/// A registry of up to 2^32-2 named objects.
 impl<Object: RegistryObject> Registry<Object> {
-    pub fn allocate_id(&mut self) -> Result<RegistryId> {
+    /// Low-level: Allocate the next free ID in the registry
+    pub fn allocate_id(&mut self) -> Result<RegistryId, RegistryError> {
         let id = self.next_free_id;
-        self.next_free_id = self
-            .next_free_id
-            .checked_add(1)
-            .context("Maximum registry entries count exceeded")?;
-        Ok(RegistryId(id.try_into()?))
+        self.next_free_id = self.next_free_id.checked_add(1).ok_or(RegistryError::NoFreeSpace)?;
+        Ok(RegistryId(id))
     }
 
-    pub fn push_object(&mut self, object: Object) -> Result<RegistryId> {
+    /// Try to put the object in the registry, allocating it a new ID.
+    /// On failure, no ID is allocated and a precise error is returned.
+    pub fn push_object(&mut self, object: Object) -> Result<RegistryId, RegistryError> {
+        let name = object.registry_name().to_owned();
+        if self.name_to_id.contains_key(&name) {
+            return Err(RegistryError::NameAlreadyExists { name });
+        }
         let id = self.allocate_id()?;
         let raw_id = id.0.get() as usize;
         if self.id_to_obj.len() <= raw_id {
@@ -151,40 +172,45 @@ impl<Object: RegistryObject> Registry<Object> {
                 object.registry_name()
             );
         }
-        let name = object.registry_name().to_owned();
-        if self.name_to_id.contains_key(&name) {
-            bail!("Object {} already exists", name);
-        }
         self.id_to_obj[raw_id] = Some(object);
         self.name_to_id.insert(name, id);
         Ok(id)
     }
 
-    pub fn insert_object_with_id(&mut self, id: RegistryId, object: Object) -> Result<()> {
+    /// Low-level: Attempt to insert an object-id pair into the registry directly, useful for deserialization or manually tweaking registry contents.
+    pub fn insert_object_with_id(&mut self, id: RegistryId, object: Object) -> Result<(), RegistryError> {
         let raw_id = id.0.get() as usize;
+        if id.0 == NonZeroU32::MAX {
+            return Err(RegistryError::NoFreeSpace);
+        }
         if self.id_to_obj.len() <= raw_id {
             self.id_to_obj.resize_with(raw_id + 32, || None);
         } else if let Some(obj) = self.id_to_obj[raw_id].as_ref() {
-            bail!("Object with ID {} already exists: {}", id, obj.registry_name());
+            return Err(RegistryError::IdAlreadyExists {
+                id,
+                name: obj.registry_name().to_owned(),
+            });
         }
         let name = object.registry_name().to_owned();
         if self.name_to_id.contains_key(&name) {
-            bail!("Object {} already exists", name);
+            return Err(RegistryError::NameAlreadyExists { name });
         }
-        if id.0.get() >= self.next_free_id {
-            self.next_free_id = id.0.get() + 1;
+        if id.0 >= self.next_free_id {
+            self.next_free_id = id.0.checked_add(1).unwrap();
         }
         self.id_to_obj[raw_id] = Some(object);
         self.name_to_id.insert(name, id);
         Ok(())
     }
 
+    /// Given a namespaced name, look up an object and its ID, or return `None` if it's not found.
     pub fn lookup_name_to_object(&self, name: RegistryNameRef) -> Option<(RegistryId, &Object)> {
         let id = *self.name_to_id.get(&name)?;
         let obj = self.id_to_obj.get(id.0.get() as usize)?.as_ref()?;
         Some((id, obj))
     }
 
+    /// Given a registry object ID, look up an object, or return `None` if it's not found.
     pub fn lookup_id_to_object(&self, id: RegistryId) -> Option<&Object> {
         self.id_to_obj.get(id.0.get() as usize)?.as_ref()
     }

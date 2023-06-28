@@ -25,6 +25,7 @@ hashbrown = { version = "0.14", features = ["serde", "nightly"] }
 kstring = { version = "2.0.0", features = ["serde"] }
 serde = { version = "1.0.164", features = ["derive"] }
 smallvec = { version = "1.10.0", features = ["serde", "const_generics", "const_new", "write", "union"] }
+thiserror = "1.0.40"
 
 [workspace.dependencies.bevy]
 git = "https://github.com/bevyengine/bevy.git"
