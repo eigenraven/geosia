@@ -93,7 +93,7 @@ impl Display for RegistryId {
 impl TryFrom<u32> for RegistryId {
     type Error = TryFromIntError;
 
-    fn try_from(value: u32) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
         Ok(Self(NonZeroU32::try_from(value)?))
     }
 }

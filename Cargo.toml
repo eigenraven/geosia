@@ -20,18 +20,29 @@ gs_schemas = { version = "0.0.1", path = "./lib/gs_schemas" }
 
 # Remote
 anyhow = "1.0.71"
-bytemuck = { version = "1.12.3", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive", "zeroable_maybe_uninit", "zeroable_atomics", "must_cast"] }
+bitvec = { version = "1.0.1", features = ["serde"] }
+bytemuck = { version = "1.13.1", features = ["extern_crate_alloc", "extern_crate_std", "min_const_generics", "derive", "zeroable_maybe_uninit", "zeroable_atomics"] }
+either = "1.8.1"
+glam = { version = "0.24.0", features = ["bytemuck", "serde"] }
 hashbrown = { version = "0.14", features = ["serde", "nightly"] }
+itertools = "0.11.0"
 kstring = { version = "2.0.0", features = ["serde"] }
+rand = "0.8.5"
+rand_pcg = "0.3.1"
 serde = { version = "1.0.164", features = ["derive"] }
 smallvec = { version = "1.10.0", features = ["serde", "const_generics", "const_new", "write", "union"] }
 thiserror = "1.0.40"
 
+# Remote, testing
+criterion = { version = "0.5.1", features = ["html_reports"] }
+quickcheck = "1.0.3"
+quickcheck_macros = "1.0.0"
+
 [workspace.dependencies.bevy]
 git = "https://github.com/bevyengine/bevy.git"
-rev = "469a19c290861049ad121aa83d72f830d1ec9b40"
+rev = "ddbfa487119231d5639a30ee6093541ad394d40e"
 default-features = false
-# Extra features used in geosia_client
+# Extra features are used in geosia_client on top of these common ones
 features = [
     # Default Bevy functionality:
     "bevy_asset",         # Assets management
@@ -51,6 +62,13 @@ features = [
     # "trace_chrome",    # Tracing using the Chrome format
 ]
 
+[workspace.dependencies.bevy_math]
+git = "https://github.com/bevyengine/bevy.git"
+rev = "ddbfa487119231d5639a30ee6093541ad394d40e"
+default-features = false
+features = [
+    "serialize",            # Support for `serde` Serialize/Deserialize
+]
 
 [profile.dev]
 opt-level = 1
