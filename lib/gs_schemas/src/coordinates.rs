@@ -27,10 +27,12 @@ pub const CHUNK_DIM3V: IVec3 = IVec3::splat(CHUNK_DIM);
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
 #[error("Given coordinates were outside of chunk boundaries: {0}")]
+/// Error when the given coordinates are outside of the chunk boundary.
 pub struct InChunkVecError(IVec3);
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
 #[error("Given index was outside of chunk boundaries: {0}")]
+/// Error when the given block index is outside of the chunk boundary.
 pub struct InChunkIndexError(usize);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default, Pod, Zeroable, Serialize, Deserialize)]
@@ -71,14 +73,42 @@ pub struct RelBlockPos(pub(crate) IVec3);
 // === Utils
 macro_rules! impl_simple_ivec3_newtype {
     ($T:ident) => {
+        impl $T {
+            /// (0, 0, 0)
+            pub const ZERO: Self = Self(IVec3::ZERO);
+            /// (1, 1, 1)
+            pub const ONE: Self = Self(IVec3::ONE);
+            /// (1, 0, 0)
+            pub const X: Self = Self(IVec3::X);
+            /// (0, 1, 0)
+            pub const Y: Self = Self(IVec3::Y);
+            /// (0, 0, 1)
+            pub const Z: Self = Self(IVec3::Z);
+
+            /// Const-friendly from<IVec3>
+            pub const fn from_ivec3(value: IVec3) -> Self {
+                Self(value)
+            }
+
+            /// Const-friendly into<IVec3>
+            pub const fn into_ivec3(self) -> IVec3 {
+                self.0
+            }
+
+            /// Constructs a new [`Self`] from the given coordinates.
+            pub const fn new(x: i32, y: i32, z: i32) -> Self {
+                Self(IVec3::new(x, y, z))
+            }
+        }
+
         impl From<IVec3> for $T {
             fn from(value: IVec3) -> Self {
-                Self(value)
+                Self::from_ivec3(value)
             }
         }
         impl From<$T> for IVec3 {
             fn from(value: $T) -> IVec3 {
-                value.0
+                value.into_ivec3()
             }
         }
         impl Deref for $T {
@@ -98,11 +128,7 @@ impl TryFrom<IVec3> for InChunkPos {
 
     #[inline]
     fn try_from(value: IVec3) -> Result<Self, Self::Error> {
-        if (value.cmplt(IVec3::ZERO) | value.cmpge(CHUNK_DIM3V)).any() {
-            Err(InChunkVecError(value))
-        } else {
-            Ok(Self(value))
-        }
+        Self::try_from_ivec3(value)
     }
 }
 
@@ -123,8 +149,42 @@ impl Deref for InChunkPos {
 }
 
 impl InChunkPos {
+    /// (0, 0, 0)
+    pub const ZERO: Self = Self(IVec3::ZERO);
+    /// (1, 1, 1)
+    pub const ONE: Self = Self(IVec3::ONE);
+    /// (1, 0, 0)
+    pub const X: Self = Self(IVec3::X);
+    /// (0, 1, 0)
+    pub const Y: Self = Self(IVec3::Y);
+    /// (0, 0, 1)
+    pub const Z: Self = Self(IVec3::Z);
+    /// (31, 31, 31)
+    pub const MAX: Self = Self(IVec3::splat(CHUNK_DIM - 1));
+
+    /// Const-friendly try_from<IVec3>
+    pub const fn try_from_ivec3(v: IVec3) -> Result<Self, InChunkVecError> {
+        let IVec3 { x, y, z } = v;
+        if (x < 0) || (x >= CHUNK_DIM) || (y < 0) || (y >= CHUNK_DIM) || (z < 0) || (z >= CHUNK_DIM) {
+            Err(InChunkVecError(v))
+        } else {
+            Ok(Self(v))
+        }
+    }
+
+    /// Constructs a new in-chunk position from the given coordinates, or returns an error if it's
+    /// outside of chunk bounds.
+    pub const fn try_new(x: i32, y: i32, z: i32) -> Result<Self, InChunkVecError> {
+        Self::try_from_ivec3(IVec3::new(x, y, z))
+    }
+
+    /// Same as `try_new(v, v, v)`
+    pub const fn try_splat(v: i32) -> Result<Self, InChunkVecError> {
+        Self::try_from_ivec3(IVec3::splat(v))
+    }
+
     /// Convert a XZY-strided index into a chunk storage array into the coordinates
-    pub fn try_from_index(idx: usize) -> Result<Self, InChunkIndexError> {
+    pub const fn try_from_index(idx: usize) -> Result<Self, InChunkIndexError> {
         if idx >= CHUNK_DIM3Z {
             return Err(InChunkIndexError(idx));
         }
@@ -137,8 +197,8 @@ impl InChunkPos {
     }
 
     /// Converts the coordinates into an XZY-strided index into the chunk storage array
-    pub fn as_index(self) -> usize {
-        (self.x + (CHUNK_DIM * self.z) + (CHUNK_DIM2 * self.y)) as usize
+    pub const fn as_index(self) -> usize {
+        (self.0.x + (CHUNK_DIM * self.0.z) + (CHUNK_DIM2 * self.0.y)) as usize
     }
 }
 
@@ -152,24 +212,52 @@ impl Add<InChunkPos> for InChunkPos {
 
 // === InChunkRange
 impl InChunkRange {
-    pub fn from_corners(a: InChunkPos, b: InChunkPos) -> Self {
-        let min = InChunkPos(a.min(*b));
-        let max = InChunkPos(a.max(*b));
+    /// Empty range containing no blocks, originating at (0, 0, 0).
+    pub const ZERO: Self = Self::from_corners(InChunkPos::ZERO, InChunkPos::ZERO);
+    /// A single block at (0, 0, 0).
+    pub const BLOCK_AT_ZERO: Self = Self::from_corners(InChunkPos::ZERO, InChunkPos::ONE);
+    /// The whole chunk `[(0, 0, 0), (31, 31, 31)]`.
+    pub const WHOLE_CHUNK: Self = Self::from_corners(InChunkPos::ZERO, InChunkPos::MAX);
+
+    /// Constructs a new range from two (inclusive) corner positions.
+    pub const fn from_corners(a: InChunkPos, b: InChunkPos) -> Self {
+        // Min/max manually implemented to allow for `const` calls
+        let (min_x, max_x) = if a.0.x < b.0.x {
+            (a.0.x, b.0.x)
+        } else {
+            (b.0.x, (a.0.x))
+        };
+        let (min_y, max_y) = if a.0.y < b.0.y {
+            (a.0.y, b.0.y)
+        } else {
+            (b.0.y, (a.0.y))
+        };
+        let (min_z, max_z) = if a.0.z < b.0.z {
+            (a.0.z, b.0.z)
+        } else {
+            (b.0.z, (a.0.z))
+        };
+        let min = InChunkPos(IVec3::new(min_x, min_y, min_z));
+        let max = InChunkPos(IVec3::new(max_x, max_y, max_z));
         Self { min, max }
     }
 
-    pub fn is_empty(self) -> bool {
-        self.min.cmpeq(*self.max).any()
+    /// Checks if the range has any blocks, false if one or more of the dimensions are zero.
+    pub const fn is_empty(self) -> bool {
+        (self.min.0.x == self.max.0.x) || (self.min.0.y == self.max.0.y) || (self.min.0.z == self.max.0.z)
     }
 
-    pub fn min(self) -> InChunkPos {
+    /// Returns the corner with the smallest coordinates.
+    pub const fn min(self) -> InChunkPos {
         self.min
     }
 
-    pub fn max(self) -> InChunkPos {
+    /// Returns the corner with the largest coordinates.
+    pub const fn max(self) -> InChunkPos {
         self.max
     }
 
+    /// Returns an iterator over all the coordinates inside this range, in XZY order.
     pub fn iter_xzy(self) -> impl Iterator<Item = InChunkPos> {
         itertools::iproduct!(
             self.min.y..=self.max.y,

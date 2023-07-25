@@ -1,3 +1,4 @@
+//! A data structure for keeping track of a stable mapping between: namespaced strings, numerical IDs and objects.
 use std::fmt::{Display, Formatter};
 use std::num::{NonZeroU32, TryFromIntError};
 
@@ -6,24 +7,31 @@ use kstring::{KString, KStringRef};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Default namespace for the Geosia's objects
 pub static GEOSIA_REGISTRY_DOMAIN: &str = "gs";
+/// Default namespace for the Geosia's objects, as a [`KString`] for convenience
 pub static GEOSIA_REGISTRY_DOMAIN_KS: KString = KString::from_static(GEOSIA_REGISTRY_DOMAIN);
 
 /// Simple namespaced registry object name
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default, Hash, Serialize, Deserialize)]
 pub struct RegistryName {
+    /// The namespace
     pub ns: KString,
+    /// The object name, unique in the namespace
     pub key: KString,
 }
 
 /// Reference to a simple namespaced registry object name, see RegistryNamed for the owned variant
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default, Hash)]
 pub struct RegistryNameRef<'n> {
+    /// The namespace
     pub ns: KStringRef<'n>,
+    /// The object name, unique in the namespace
     pub key: KStringRef<'n>,
 }
 
 impl RegistryName {
+    /// Constructs a `gs:`-namespaced name
     pub fn geosia(key: impl Into<KString>) -> Self {
         Self {
             ns: GEOSIA_REGISTRY_DOMAIN_KS.clone(),
@@ -31,12 +39,14 @@ impl RegistryName {
         }
     }
 
+    /// Converts the name to a reference struct
     pub fn as_ref(&self) -> RegistryNameRef {
         self.into()
     }
 }
 
 impl<'a> RegistryNameRef<'a> {
+    /// Constructs a `gs:`-namespaced name reference
     pub fn geosia(key: impl Into<KStringRef<'a>>) -> Self {
         Self {
             ns: KStringRef::from(&GEOSIA_REGISTRY_DOMAIN_KS),
@@ -44,18 +54,21 @@ impl<'a> RegistryNameRef<'a> {
         }
     }
 
+    /// Converts the name to an owned struct, copying the strings as needed
     pub fn to_owned(&self) -> RegistryName {
         self.into()
     }
 }
 
 impl<'a> Equivalent<RegistryName> for RegistryNameRef<'a> {
+    /// Enabled heterogeneous lookup in [`HashMap`] and related types.
     fn equivalent(&self, key: &RegistryName) -> bool {
         key.as_ref() == *self
     }
 }
 
 impl<'a> Equivalent<RegistryNameRef<'a>> for RegistryName {
+    /// Enabled heterogeneous lookup in [`HashMap`] and related types.
     fn equivalent(&self, key: &RegistryNameRef) -> bool {
         *key == self.as_ref()
     }
@@ -116,6 +129,7 @@ pub trait RegistryObject {
     fn registry_name(&self) -> RegistryNameRef;
 }
 
+/// A data structure for keeping track of a stable mapping between: namespaced strings, numerical IDs and objects.
 #[derive(Serialize, Deserialize)]
 pub struct Registry<Object: RegistryObject> {
     next_free_id: NonZeroU32,
@@ -136,10 +150,20 @@ impl<Object: RegistryObject> Default for Registry<Object> {
 /// Possible errors from Registry operations
 #[derive(Debug, Error)]
 pub enum RegistryError {
+    /// A numeric ID that is already present in the registry was prevented from being overwritten.
     #[error("Id {id} already exists when trying to register {name}")]
-    IdAlreadyExists { id: RegistryId, name: RegistryName },
+    IdAlreadyExists {
+        /// The ID already present.
+        id: RegistryId,
+        /// The name of the object at the ID that was attempted to be overwritten.
+        name: RegistryName,
+    },
+    /// A name that is already present in the registry was prevented from being overwritten.
     #[error("Name {name} already exists in the registry")]
-    NameAlreadyExists { name: RegistryName },
+    NameAlreadyExists {
+        /// The conflicting name.
+        name: RegistryName,
+    },
     /// No more unallocated space in the registry. The allocator is a simple bump allocator, so if objects were removed, it might be possible to optimize the registry down to have free space again.
     #[error("No free space in the registry")]
     NoFreeSpace,

@@ -1,3 +1,4 @@
+//! Descriptors for in-game voxel/block types.
 use std::fmt::{Debug, Formatter};
 
 use bytemuck::{Pod, TransparentWrapper, Zeroable};

@@ -1,3 +1,4 @@
+//! Data structures for storage and manipulation of per-block data.
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::iter::{Enumerate, Map, Take};
@@ -24,7 +25,7 @@ pub trait ChunkStorage<DataType: ChunkDataType> {
     /// Clone all elements of the chunk into a dense XZY-ordered array (with strides of X=1, Z=32, Y=32²).
     fn copy_dense(&self, output: &mut [DataType; CHUNK_DIM3Z]);
     /// Gets the element at the given coordinates, or [`None`] if there is no chunk data at all.
-    fn get(&self, position: InChunkPos) -> Option<&DataType>;
+    fn get(&self, position: InChunkPos) -> &DataType;
     /// Gets the element at the given coordinates, for [`Copy`] types. If there is no chunk data, returns the default value.
     fn get_copy(&self, position: InChunkPos) -> DataType
     where
@@ -51,7 +52,9 @@ pub struct PaletteStorage<DataType: ChunkDataType> {
 /// Simple XZY dense array storage for chunk data (with strides of X=1, Z=32, Y=32²).
 #[derive(Clone, Eq, PartialEq)]
 pub enum ArrayStorage<T> {
+    /// Single-element case for cases where every single chunk element is identical
     Singleton(T),
+    /// Case where at least one element in a chunk is different
     Array(Box<[T; CHUNK_DIM3Z]>),
 }
 
@@ -65,10 +68,13 @@ fn i_to_xzy_itermap<T>((i, val): (usize, T)) -> (InChunkPos, T) {
     (InChunkPos::try_from_index(i).unwrap(), val)
 }
 
+type XzyIterator<Iter> =
+    Map<Enumerate<Take<Iter>>, fn((usize, <Iter as Iterator>::Item)) -> (InChunkPos, <Iter as Iterator>::Item)>;
+
 /// Extension methods for iterators over chunks
 trait ChunkIterator: Iterator {
     #[inline]
-    fn enumerate_xzy(self) -> Map<Enumerate<Take<Self>>, fn((usize, Self::Item)) -> (InChunkPos, Self::Item)>
+    fn enumerate_xzy(self) -> XzyIterator<Self>
     where
         Self: Sized,
     {
@@ -318,11 +324,11 @@ impl<DataType: ChunkDataType + Copy> ChunkStorage<DataType> for PaletteStorage<D
     }
 
     #[inline]
-    fn get(&self, position: InChunkPos) -> Option<&DataType> {
+    fn get(&self, position: InChunkPos) -> &DataType {
         match self.data() {
-            SafePaletteIndices::Singleton => self.palette.first(),
-            SafePaletteIndices::U8(indices) => Some(&self.palette[indices[position.as_index()] as usize]),
-            SafePaletteIndices::U16(indices) => Some(&self.palette[indices[position.as_index()] as usize]),
+            SafePaletteIndices::Singleton => &self.palette[0],
+            SafePaletteIndices::U8(indices) => &self.palette[indices[position.as_index()] as usize],
+            SafePaletteIndices::U16(indices) => &self.palette[indices[position.as_index()] as usize],
         }
     }
 
@@ -411,5 +417,56 @@ impl<DataType: ChunkDataType + Copy> ChunkStorage<DataType> for PaletteStorage<D
         // Needs upgrade, otherwise an early return is used above. This should only recurse at most once.
         self.upgrade_storage();
         self.fill(range, new_value);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn palette_set() {
+        let mut chunk: PaletteStorage<u64> = PaletteStorage::default();
+        let zero_arr: Box<[u64; CHUNK_DIM3Z]> = bytemuck::zeroed_box();
+        let mut one_arr: Box<[u64; CHUNK_DIM3Z]> = bytemuck::zeroed_box();
+        one_arr.fill(1);
+        let mut out_arr: Box<[u64; CHUNK_DIM3Z]> = bytemuck::zeroed_box();
+
+        for idx in 0..CHUNK_DIM3Z {
+            assert_eq!(0, chunk.get_copy(InChunkPos::try_from_index(idx).unwrap()));
+        }
+        chunk.copy_dense(&mut out_arr);
+        assert_eq!(&zero_arr[..], &out_arr[..]);
+
+        chunk.fill(InChunkRange::WHOLE_CHUNK, 1);
+        for idx in 0..CHUNK_DIM3Z {
+            assert_eq!(1, chunk.get_copy(InChunkPos::try_from_index(idx).unwrap()));
+        }
+        chunk.copy_dense(&mut out_arr);
+        assert_eq!(&one_arr[..], &out_arr[..]);
+
+        for idx in 0..CHUNK_DIM3Z {
+            chunk.put(InChunkPos::try_from_index(idx).unwrap(), idx as u64);
+        }
+        for idx in 0..CHUNK_DIM3Z {
+            assert_eq!(chunk.get_copy(InChunkPos::try_from_index(idx).unwrap()), idx as u64);
+        }
+
+        chunk.fill(InChunkRange::WHOLE_CHUNK, 1_000_000);
+        chunk.fill(
+            InChunkRange::from_corners(
+                InChunkPos::ZERO,
+                InChunkPos::try_new(CHUNK_DIM - 1, 8, CHUNK_DIM - 1).unwrap(),
+            ),
+            2_000_000,
+        );
+
+        for (pos, val) in chunk.iter_with_coords() {
+            if pos.y <= 8 {
+                assert_eq!(*val, 2_000_000);
+            } else {
+                assert_eq!(*val, 1_000_000);
+            }
+        }
     }
 }
